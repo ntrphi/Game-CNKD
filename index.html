@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="public/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="public/css/main.css">
+    <style type="text/css" media="screen">
+        span{
+            color: black;
+            font-size: 30px;
+            font-weight: bold;
+            display: inline-block;
+            width: 100px;
+        }
+        .new-game, .board{
+            width: 100%;
+            height: 670px;
+        }
+        .form-group{
+            height: 200px;
+            padding: 10px;
+            background: #FFF;
+        }
+        .guest{
+            margin:0 30px;
+            z-index: 100;
+        }
+        table{
+            margin: auto;
+            padding: 20px;
+            background-color: #FFF;
+        }
+        tr, td{
+            min-width: 200px;
+            height: 50px;
+            border: 1px solid black;
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="new-game col-md-6 offset-md-3"  >
+        <div class="form-group">
+                    <label>Nhập tên</label>
+                    <input type="text"  placeholder="Nhập tên" class="form-control name" required>
+                    <br>
+                    <button id="start" type="submit" class="btn btn-sm btn-success">Start game</button>
+        </div>
+    </div>
+    <div class="container" style="display: none;">
+        <div class="right" style="position: absolute; top: 50px; right: 50px; background: white; padding: 20px; box-shadow: inset 10px 10px 5px #00FFE8,10px 10px 5px #00FFE8;border-radius: 10px;" >
+        <div class="question-div" style="color: red; font-size: 40px;"></div>
+        <div class="show-point" style="font-size:30px; min-height: 60px; "></div>
+        <div class="col-12 answer-div" style="margin-bottom: 30px;"></div>
+        <div class="point">
+           <span>Điểm</span> <input class="point" type="text" name="" value="0" placeholder="" style="min-width: 50px; height: 50px; border: 1px solid green;border-radius:5px ; text-align: center; font-size: 30px">
+           <br>
+           <br>
+           <span>Lượt</span> <input class="LuotChoi" type="text" name="" value="2" placeholder="" style="min-width: 50px; height: 50px; border: 1px solid green;border-radius:5px ; text-align: center; font-size: 30px">
+        </div>
+        </div>
+        <div class="the_wheel" style="position: relative;" >
+            <canvas id='canvas' width='580' height='450'>
+                Canvas not supported, use 'another browser.
+            </canvas>
+        <button id="quay" style="position: absolute; top: 75px; left: 20px; width: 400px; height: 400px; opacity: 0">Quay</button>
+        <div class="guest" style="margin-left: 130px;">
+                    <button id="guest" type="submit" class="btn btn-sm btn-success">Đoán luôn</button>
+                    <button id="stop" type="submit" class="btn btn-sm btn-danger">Dừng chơi</button>
+       </div>
+        </div>
+        <div class="row">
+            <div class="col-12 bangchucai"></div>
+        </div>
+    </div>
+    <div class="board" style="display: none; min-height: 655px; height: 100%;">
+        <table>
+            <thead>
+                <tr>
+                    <td colspan="2">Leader Board</td>
+                    <td colspan="" style="text-align: center;"><button id="replay" type="submit" class="btn btn-sm btn-danger" style="width: 200px; font-weight: bold">Replay</button></td>
+                </tr>
+                <tr>
+                    <td>No.</td>
+                    <td>Player</td>
+                    <td>Score</td>
+                </tr>
+            </thead>      
+            <tbody class="sc-board">
+            </tbody>
+        </table>
+    </div>
+    <script src="public/jquery.min.js"></script>
+    <script src="public/bootstrap/js/bootstrap.min.js"></script>
+    <script src="public/winwheel/Winwheel.min.js"></script>
+    <script src="public/TweenMax.min.js"></script>
+    <script src="public/js/question.js"></script>
+    <script>
+        var player="";
+        $('#start').on('click', function(){
+            $('.container').css('display', 'block');
+            $('.new-game').css('display','none');
+            $('.board').css('display','none');
+            player= $('input.name').val();
+        });
+        if (!localStorage.ldBoard) {
+            var leaderBoard=[];
+            localStorage.setItem('ldBoard',JSON.stringify(leaderBoard));
+        }
+    function leaderBd(playername,point){
+        var flag=true;
+        const board = JSON.parse(localStorage.getItem('ldBoard'));
+        console.log(board);
+        for (var i = 0; i < board.length; i++) {
+            if (playername==board[i].name){
+                if (board[i].score<point) {
+          board[i].score=point;  
+                }
+            flag= false;
+            }
+        }
+        if (flag==true) {
+            const addBoard = {
+                name:`${playername}`,
+                score:`${point}`
+            }
+            board.push(addBoard);
+        }
+        localStorage.setItem('ldBoard',JSON.stringify(board));
+    };
+    function drawTable (arg) {
+            var content="";
+            var arr = JSON.parse(localStorage.getItem('ldBoard'));
+            arr.sort(function(a, b){
+            return (a.score - b.score);
+            });
+            arr.reverse();
+        for (var i = 0; i < 10; i++) {
+            content += `<tr>
+                            <td>${i+1}</td>
+                            <td>${arr[i].name}</td>
+                            <td>${arr[i].score}</td>
+                        </tr>
+                        `;
+        }
+            var parent = document.querySelector('.sc-board');
+            parent.innerHTML=content;
+
+    }
+    
+        var wheelSpinning = false;
+        var wheelPower = 2;
+
+        let theWheel = new Winwheel({
+            'numSegments'  : 13,         // Number of segments
+            'outerRadius'  : 212,       // The size of the wheel.
+            'centerX'      : 217,       // Used to position on the background correctly.
+            'centerY'      : 219,
+            'textFontSize' : 25,        // Font size.
+            'segments'     :            // Definition of all the segments.
+            [
+                {'fillStyle' : '#eae56f', 'text' : '100'},
+                {'fillStyle' : '#89f26e', 'text' : '200'},
+                {'fillStyle' : '#7de6ef', 'text' : '300'},
+                {'fillStyle' : '#e7706f', 'text' : 'Lose Turn'},
+                {'fillStyle' : '#eae56f', 'text' : '400'},
+                {'fillStyle' : '#89f26e', 'text' : '500'},
+                {'fillStyle' : '#7de6ef', 'text' : '600'},
+                {'fillStyle' : '#e7706f', 'text' : 'Lose Point'},
+                {'fillStyle' : '#eae56f', 'text' : '700'},
+                {'fillStyle' : '#89f26e', 'text' : '800'},
+                {'fillStyle' : '#e7706f', 'text' : '900'},
+                {'fillStyle' : '#e7706f', 'text' : '1000'},
+                {'fillStyle' : '#7de6ef', 'text' : 'Turn Bonus'},
+            ],
+            'animation' :               // Definition of the animation
+            {
+                'type'     : 'spinToStop',
+                'duration' : 10,
+                'spins'    : 8,
+                'callbackFinished' : alertPrize
+            }
+        });
+
+        function startSpin()
+        {
+            // Ensure that spinning can't be clicked again while already running.
+            if (wheelSpinning == false) {
+                if (wheelPower == 1) {
+                    theWheel.animation.spins = 3;
+                } else if (wheelPower == 2) {
+                    theWheel.animation.spins = 8;
+                } else if (wheelPower == 3) {
+                    theWheel.animation.spins = 15;
+                }
+                theWheel.startAnimation();
+                wheelSpinning = true;
+            }
+        }
+
+        function resetWheel()
+        {
+            theWheel.stopAnimation(false);  // Stop the animation, false as param so does not call callback function.
+            theWheel.rotationAngle = 0;     // Re-set the wheel angle to 0 degrees.
+            theWheel.draw();                // Call draw to render changes to the wheel.
+            wheelSpinning = false;          // Reset to false to power buttons and spin can be clicked again.
+        }
+
+        // -------------------------------------------------------
+        // Called when the spin animation has finished by the callback feature of the wheel because I specified callback in the parameters.
+        // -------------------------------------------------------
+        var diem =0;
+        var currentPoint=0;
+        var LuotChoi=2;
+        var QA = 0;
+        var win=0;
+        $('#guest').on('click', function () {
+            if (diem==0) {
+                var yourAns= prompt("Mời bạn đoán ");
+                var ans= questions[QA].a;
+                if (yourAns.toLowerCase()==ans.toLowerCase()) {
+                    trAleart();
+                alert('Bạn đã trả lời đúng câu hỏi và nhận 5000 điểm');
+                currentPoint+=5000;
+                $('input.point').val(currentPoint);
+                 QA++;
+                    if (QA==questions.length) {
+                        stop();
+                    }else {
+                    qa(QA);
+                    }
+                }else {
+                falAleart();
+                alert('bạn đã trả lời sai');
+                stop();
+                }           
+            }
+        });
+        function stop() {
+            alert('Bạn đã kết thúc trò chơi với '+currentPoint+'điểm');
+            leaderBd(player, currentPoint);
+            drawTable(); 
+            $('.container').css('display', 'none');
+            $('.new-game').css('display','none');
+            $('.board').css('display','block');
+        }
+        $('#stop').on('click', stop);
+        $('#replay').on('click', function () {
+            $('.container').css('display', 'none');
+            $('.new-game').css('display','block');
+            $('.board').css('display','none');
+            diem =0;
+            currentPoint=0;
+            $('input.point').val(currentPoint);
+            LuotChoi=2;
+            $('input.LuotChoi').val(LuotChoi);
+            $('.show-point').text("");
+
+            QA = 0;
+            win=0;
+            qa(QA);
+        });
+        function qa (a) {
+            QA=a;
+            play();
+            sinhBangChuCai();
+        }
+        function audio() {
+            let audio=new Audio('nhacnen.mp3');
+            audio.play();
+        }
+        function trAleart(){
+            let tr = new Audio('true.mp3');
+            tr.play();            
+        }
+        function falAleart(){
+            let fal = new Audio('false.mp3');
+            fal.play();            
+        }
+        function alertPrize(indicatedSegment)
+        {
+            if (!isNaN(indicatedSegment.text)) {
+                diem= indicatedSegment.text;
+                $('.show-point').text("You have won " + indicatedSegment.text).css('color', 'green');
+            }
+            else if (indicatedSegment.text=='Lose Turn'){
+                $('.show-point').text("You have lost turn").css('color', 'red');
+                diem=0;
+                LuotChoi-=1;
+                $('input.LuotChoi').val(LuotChoi);
+            }else if(indicatedSegment.text=='Lose Point') {
+                $('.show-point').text("You have lost all point").css('color', 'red');
+                diem=0;
+                currentPoint=0;
+                $('input.point').val(currentPoint);
+                LuotChoi-=1;
+                $('input.LuotChoi').val(LuotChoi);                
+            }else {
+                $('.show-point').text("You have gain a turn ").css('color','orange')
+                diem=0;
+                LuotChoi+=1;
+                $('input.LuotChoi').val(LuotChoi); 
+            }
+            if (LuotChoi<1) {
+            stop();
+        }
+            resetWheel()
+        }
+        
+        $('#quay').on('click', function(){
+            if (LuotChoi>=1&&diem==0) {
+            audio();
+            startSpin();
+            }
+        });
+        function sinhBangChuCai(){
+            //bangchucai
+            var bccItem = ``;
+            bangChuCai.forEach(element => {
+                bccItem += `<div class="bcctmp" choosed="0" style="border:1px solid black; border-radius:10px; background:#0466FA" onclick="chonchu('${element}', this)">${element}</div>`
+            });
+            $('.bangchucai').empty();
+            $('.bangchucai').html(bccItem);
+        }
+        function chonchu(val, thisel){
+            if (diem!=0) {
+            if($(thisel).attr('choosed') != 1){
+                var listatmp = document.querySelectorAll('.atmp');
+                var i=0;
+                for (let index = 0; index < listatmp.length; index++) {
+                    const element = listatmp[index];
+                    if($(element).text().toLowerCase() == val.toLowerCase()){
+                        $(element).css('backgroundColor', 'white');
+                        currentPoint=Number($('input.point').val()) + Number(diem);
+                        $('input.point').val(currentPoint);
+                        trAleart();
+                        i++;
+                        win++;
+                    }
+                }
+                if (i==0) {
+                    falAleart();
+                    alert('không có chữ bạn chọn');
+                    LuotChoi--;
+                    $('input.LuotChoi').val(LuotChoi); 
+                }
+                if (LuotChoi<1) {
+                    stop();
+                }
+                if (win==listatmp.length) {
+                    alert('you win');
+                    QA++;
+                    if (QA==questions.length) {
+                            stop();
+                    }else {
+                        qa(QA);
+                        win=0;    
+                    }
+                }
+                $(thisel).attr('choosed', 1);
+                $(thisel).css('backgroundColor', 'red');
+                diem=0;
+            }
+        }
+    }
+        function play(){
+            var cauHoiHienTai = questions[QA];
+            var cauhoi = cauHoiHienTai.q;
+            $('.question-div').text(cauhoi);
+            $('.answer-div').empty();
+            for(var i = 0; i < cauHoiHienTai.a.length; i++){
+                var kytu = cauHoiHienTai.a[i];
+                console.log(kytu);
+                var atmp = `
+                    <div class="atmp" >${kytu}</div>
+                `;
+                $('.answer-div').append(atmp);
+            }
+        }
+        play();
+        sinhBangChuCai();
+        
+    </script>
+</body>
+</html>
